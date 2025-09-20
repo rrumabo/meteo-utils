@@ -1,0 +1,28 @@
+----------------
+__pycache__/
+*.py[cod]
+*$py.class
+----------------
+.venv/
+venv/
+env/
+ENV/
+----------------
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+----------------
+build/
+dist/
+*.egg-info/
+.eggs/
+----------------
+*.log
+*.tmp
+*.swp
+.DS_Store
+----------------
+.vscode/
+.idea/
+----------------
+outputs/           # simulation results
+examples/*/outputs # if you add outputs per example config
