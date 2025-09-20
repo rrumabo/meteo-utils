@@ -1,0 +1,21 @@
+grid:
+  N: 256       # number of grid points
+  L: 1.0       # domain length
+bc:
+  type: periodic
+time:
+  dt: 0.0005   # time step
+  T: 0.05      # total integration time
+physics:
+  pde: heat
+  params:
+    alpha: 0.01   # diffusion coefficient
+integrator:
+  method: rk4     # euler, rk2, rk4 supported
+initial_condition:
+  type: gaussian
+  center: 0.5
+  sigma: 0.05
+  amp: 1.0
+io:
+  outdir: outputs/heat1d
