@@ -1,5 +1,5 @@
 import numpy as np
-from de_solver.core.operators import apply_op
+from src.core.operators import apply_op
 
 def run_heat_solver_1d(L_op, u0, T, dt, dx=None, step_func=None, rhs_func=None):
     """

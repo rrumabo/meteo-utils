@@ -1,5 +1,5 @@
 import numpy as np
-from de_solver.runner import solve_fixed_step
+from src.runner import solve_fixed_step
 
 def f(t, y, p):
     """ODE: y' = -k y"""

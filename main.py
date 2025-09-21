@@ -1,8 +1,8 @@
 import argparse, os, numpy as np
-from de_solver.runner import solve_fixed_step
-from de_solver.utils.config_loader import load_config
-from de_solver.pdes.heat_solver_1d import run_heat_solver_1d 
-from de_solver.visualization.plotting_1_2d import plot_field_1d
+from src.runner import solve_fixed_step
+from src.utils.config_loader import load_config
+from src.pdes.heat_solver_1d import run_heat_solver_1d 
+from src.visualization.plotting_1_2d import plot_field_1d
 
 def rhs_heat_1d(t, u, p):
     """

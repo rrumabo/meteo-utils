@@ -1,4 +1,3 @@
-# src/visualization/animation_1d.py
 from __future__ import annotations
 
 import os

@@ -1,9 +1,16 @@
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Any
+from pathlib import Path
 import numpy as np
 
-from de_solver.core import time_integrators as ti
-from de_solver.utils.diagnostic_manager import DiagnosticManager
+from src.core import time_integrators as ti
+from src.utils.diagnostic_manager import DiagnosticManager
+from src.utils.diagnostics import (
+    compute_norms,
+    cfl_number_advection,
+    cfl_number_diffusion,
+    write_metrics_json,
+)
 
 
 @dataclass
@@ -52,6 +59,10 @@ def solve_fixed_step(
     save_every: int = 1,
     callbacks: Optional[Iterable[Callable[[float, np.ndarray, Dict[str, Any]], Optional[bool]]]] = None,
     diagnostics: Optional[DiagnosticManager] = None,
+    metrics_out_dir: Optional[Path] = None,
+    norm_grid: Optional[Tuple[float, Optional[float]]] = None,
+    cfl_specs: Optional[Dict[str, Dict[str, Any]]] = None,
+    norm_save_every: int = 1,
 ) -> Solution:
     """
     Fixed-step time integration for ODEs or semi-discrete PDEs (Method of Lines).
@@ -83,6 +94,19 @@ def solve_fixed_step(
     t_hist: List[float] = [t]
     y_hist: List[np.ndarray] = [np.array(y, copy=True)]
 
+    # --- Norms and metrics initialization ---
+    l2_hist: List[float] = []
+    dx_val: Optional[float] = None
+    dy_val: Optional[float] = None
+    if norm_grid is not None:
+        dx_val = float(norm_grid[0])
+        dy_val = None if len(norm_grid) == 1 or norm_grid[1] is None else float(norm_grid[1])
+        try:
+            n0 = compute_norms(y, dx=dx_val, dy=dy_val)
+            l2_hist.append(n0["L2"]) 
+        except Exception:
+            pass
+
     steps = 0
     while t < t1 - 1e-15:
         # Adjust last dt to land exactly on t1
@@ -98,6 +122,12 @@ def solve_fixed_step(
         if (steps % save_every) == 0 or t >= t1 - 1e-15:
             t_hist.append(t)
             y_hist.append(np.array(y, copy=True))
+            if norm_grid is not None and (steps % norm_save_every == 0 or t >= t1 - 1e-15):
+                try:
+                    nnow = compute_norms(y, dx=dx_val if dx_val is not None else 1.0, dy=dy_val)
+                    l2_hist.append(nnow["L2"]) 
+                except Exception:
+                    pass
 
         # Callbacks can stop early
         if cbs:
@@ -107,6 +137,56 @@ def solve_fixed_step(
 
     dm.stop()
 
+    # --- Metrics output and CFL computation ---
+    cfls: Dict[str, float] = {}
+    if cfl_specs:
+        for key, spec in cfl_specs.items():
+            stype = spec.get("type", "diffusion")
+            if stype == "advection":
+                cfls[key] = float(
+                    cfl_number_advection(
+                        dt=float(spec["dt"]),
+                        dx=float(spec["dx"]),
+                        a=spec.get("a"),
+                        u=spec.get("u"),
+                    )
+                )
+            elif stype == "diffusion":
+                cfls[key] = float(
+                    cfl_number_diffusion(
+                        dt=float(spec["dt"]),
+                        dx=float(spec["dx"]),
+                        nu=float(spec["nu"]),
+                        dim=int(spec.get("dim", 1)),
+                    )
+                )
+            elif "value" in spec:
+                cfls[key] = float(spec["value"])
+
+    if metrics_out_dir is not None:
+        last_state = y_hist[-1]
+        if isinstance(last_state, np.ndarray):
+            if last_state.ndim == 1:
+                grid_info = last_state.shape[0]
+            elif last_state.ndim == 2:
+                grid_info = list(last_state.shape)
+            else:
+                grid_info = int(last_state.size)
+        else:
+            grid_info = 0
+        try:
+            write_metrics_json(
+                out_dir=metrics_out_dir,
+                scheme=method,
+                grid=grid_info,
+                dt=float(dt),
+                cfl=cfls,
+                norms_over_time={"L2": l2_hist} if l2_hist else {},
+                extras={"elapsed_s": float(dm.summary().get("elapsed_s", 0.0))},
+            )
+        except Exception:
+            pass
+
     T = np.asarray(t_hist, dtype=float)
     Y = np.stack(y_hist, axis=0)  # shape (Ns, ...)
 
@@ -115,5 +195,7 @@ def solve_fixed_step(
         "dt": float(dt),
         "steps": steps,
         **dm.summary(),
+        "norms": {"L2": l2_hist} if l2_hist else {},
+        "cfl": cfls,
     }
     return Solution(t=T, y=Y, meta=meta)

@@ -1,6 +1,7 @@
+#performance + metadata
+
 import time
 from typing import Any, Dict
-
 
 class DiagnosticManager:
     """
