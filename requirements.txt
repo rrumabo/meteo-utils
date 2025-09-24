@@ -1,5 +1,6 @@
-numpy
 scipy
 matplotlib
 pyyaml
-pytest
+numpy>=1.24
+matplotlib>=3.7
+pytest>=7.0
