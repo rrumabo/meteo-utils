@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Dict, Tuple
+from .urban_physics import seb_source, drag_coeff
 
 def ddx_central(f: np.ndarray, dx: float) -> np.ndarray:
     return (np.roll(f, -1, axis=-1) - np.roll(f, 1, axis=-1)) / (2.0*dx)
@@ -52,3 +53,46 @@ def rhs_sw_2d(t: float, Y: np.ndarray, p: Dict) -> np.ndarray:
 
     dYdt = np.stack([dhdt, dudt, dvdt], axis=0)
     return dYdt
+
+def rhs_sw_uhi_2d(t: float, Y: np.ndarray, p: Dict) -> np.ndarray:
+    """
+    Y: (4, Ny, Nx) -> [h, u, v, T]
+    Shallow-water + urban temperature:
+      - h: continuity (flux form)
+      - u,v: advection + Coriolis + pressure + viscosity + linear drag
+      - T: advection–diffusion + SEB source
+    """
+    h, u, v, T = Y
+    g = p["g"]; f = p.get("f", 0.0); nu = p.get("nu", 0.0)
+    dx = p["dx"]; dy = p["dy"]
+
+    # Continuity
+    hu = h * u
+    hv = h * v
+    dhdt = -(ddx_central(hu, dx) + ddy_central(hv, dy))
+    if "Fh" in p:
+        dhdt = dhdt + p["Fh"]
+
+    # Momentum: advection + Coriolis + pressure + viscosity
+    adv_u  = u * ddx_central(u, dx) + v * ddy_central(u, dy)
+    adv_v  = u * ddx_central(v, dx) + v * ddy_central(v, dy)
+    pres_x = -g * ddx_central(h, dx)
+    pres_y = -g * ddy_central(h, dy)
+    cor_u  = -f * v
+    cor_v  =  f * u
+    visc_u = nu * laplacian(u, dx, dy) if nu else 0.0
+    visc_v = nu * laplacian(v, dx, dy) if nu else 0.0
+
+    # Linear Rayleigh drag from roughness + optional global Du/Dv
+    Cd = drag_coeff(p.get("roughness", 0.0))  # scalar or (Ny, Nx)
+    dudt = -(adv_u) + cor_u + pres_x + visc_u - Cd * u - p.get("Du", 0.0) * u
+    dvdt = -(adv_v) + cor_v + pres_y + visc_v - Cd * v - p.get("Dv", 0.0) * v
+
+    # Temperature: advection–diffusion + SEB source
+    kT   = p.get("kT", 1e-3)
+    advT = -(u * ddx_central(T, dx) + v * ddy_central(T, dy))
+    difT = kT * laplacian(T, dx, dy) if kT else 0.0
+    srcT = seb_source(T, albedo=p.get("albedo", 0.2), veg=p.get("veg", 0.0), t=t, p=p)
+    dTdt = advT + difT + srcT
+
+    return np.stack([dhdt, dudt, dvdt, dTdt], axis=0)

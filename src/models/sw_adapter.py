@@ -1,7 +1,7 @@
 import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Optional
-from src.models.shallow_water import rhs_sw_2d, cfl_gravity
+from src.models.shallow_water import rhs_sw_2d, rhs_sw_uhi_2d, cfl_gravity
 
 def make_initial_sw(Ny: int, Nx: int, h0: float = 1.0, jet_amp: float = 0.1) -> np.ndarray:
     y = np.linspace(0.0, 1.0, Ny, endpoint=False)
@@ -13,7 +13,8 @@ def make_initial_sw(Ny: int, Nx: int, h0: float = 1.0, jet_amp: float = 0.1) -> 
     return np.stack([h, u, v], axis=0)
 
 def rhs(t, Y, params: Dict):
-    return rhs_sw_2d(t, Y, params)
+    # 4 fields -> SW + UHI ; 3 fields -> classic SW
+    return rhs_sw_uhi_2d(t, Y, params) if Y.shape[0] == 4 else rhs_sw_2d(t, Y, params)
 
 def sw_cfl(Y: np.ndarray, params: Dict, dt: float) -> float:
     h, u, v = Y[0], Y[1], Y[2]
