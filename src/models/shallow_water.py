@@ -21,7 +21,7 @@ def cfl_gravity(u: np.ndarray, v: np.ndarray, h: np.ndarray, g: float, dt: float
 def rhs_sw_2d(t: float, Y: np.ndarray, p: Dict) -> np.ndarray:
     """
     Y shape: (3, Ny, Nx) -> [h, u, v]
-    p: {"g":..., "f":..., "nu":..., "dx":..., "dy":..., "Fh": float or 2D, "Du": float, "Dv": float}
+    p: {"g":..., "f":..., "nu":..., "dx":..., "dy":..., "Fh": float | 2D | callable(t)->(float|2D), "Du": float|2D, "Dv": float|2D}
     Returns dY/dt with same shape.
     """
     h, u, v = Y[0], Y[1], Y[2]
@@ -32,9 +32,10 @@ def rhs_sw_2d(t: float, Y: np.ndarray, p: Dict) -> np.ndarray:
     hu = h * u
     hv = h * v
     dhdt = -(ddx_central(hu, dx) + ddy_central(hv, dy))
-    # Optional forcing on h (heating/cooling)
-    if "Fh" in p:
-        dhdt = dhdt + p["Fh"]
+    # Optional forcing on h (heating/cooling); supports scalar, (Ny,Nx) array, or callable(t)->scalar/array
+    Fh = p.get("Fh", None)
+    if Fh is not None:
+        dhdt = dhdt + (Fh(t) if callable(Fh) else Fh)
 
     # Momentum: u_t, v_t (adv + Coriolis + pressure + viscous + damping)
     adv_u = u*ddx_central(u, dx) + v*ddy_central(u, dy)
@@ -61,6 +62,7 @@ def rhs_sw_uhi_2d(t: float, Y: np.ndarray, p: Dict) -> np.ndarray:
       - h: continuity (flux form)
       - u,v: advection + Coriolis + pressure + viscosity + linear drag
       - T: advection–diffusion + SEB source
+    Supports: Fh as scalar/2D/callable; Du/Dv as scalar or 2D fields; roughness→Cd via drag_coeff().
     """
     h, u, v, T = Y
     g = p["g"]; f = p.get("f", 0.0); nu = p.get("nu", 0.0)
@@ -70,8 +72,9 @@ def rhs_sw_uhi_2d(t: float, Y: np.ndarray, p: Dict) -> np.ndarray:
     hu = h * u
     hv = h * v
     dhdt = -(ddx_central(hu, dx) + ddy_central(hv, dy))
-    if "Fh" in p:
-        dhdt = dhdt + p["Fh"]
+    Fh = p.get("Fh", None)
+    if Fh is not None:
+        dhdt = dhdt + (Fh(t) if callable(Fh) else Fh)
 
     # Momentum: advection + Coriolis + pressure + viscosity
     adv_u  = u * ddx_central(u, dx) + v * ddy_central(u, dy)

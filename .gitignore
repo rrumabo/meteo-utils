@@ -25,4 +25,4 @@ dist/
 .idea/
 ----------------
 outputs/           # simulation results
-examples/*/outputs # if you add outputs per example config
+examples/*/outputs # if you add outputs per example configdata/*.nc
