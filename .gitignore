@@ -8,8 +8,8 @@ venv/
 env/
 ENV/
 ----------------
-.ipynb_checkpoints/
-*.ipynb_checkpoints
+# Jupyter checkpoints
+**/.ipynb_checkpoints/
 ----------------
 build/
 dist/
@@ -24,5 +24,10 @@ dist/
 .vscode/
 .idea/
 ----------------
-outputs/           # simulation results
-examples/*/outputs # if you add outputs per example configdata/*.nc
+# Data & artifacts
+data/
+cache/
+outputs/                 # simulation results
+examples/*/outputs       # per-example outputs
+*.npz
+*.nc
